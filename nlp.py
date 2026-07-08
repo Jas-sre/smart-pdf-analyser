@@ -139,3 +139,31 @@ def bm25_search(pages: list[dict], question: str, top_n: int = 1,
     results.sort(key=lambda x: x['score'], reverse=True)
 
     return results[:top_n]
+
+def get_key_sentences(pages: list[dict], top_n: int = 3) -> list[dict]:
+    """
+    Extract key sentences based on keyword overlap.
+    Sentences with more top-keywords are likely more important.
+    """
+
+    tfidf_scores = compute_tfidf(pages)
+    top_keywords = [word for word, score in
+                    Counter(tfidf_scores).most_common(10)]
+
+    sentences = text_to_sentences(pages)
+
+    results = []
+    for sent in sentences:
+        sent_words = set(normalize_word(w) for w in sent['sentence'].lower().split())
+
+        overlap = sum(1 for kw in top_keywords if kw in sent_words)
+
+        results.append({
+            'sentence': sent['sentence'],
+            'pg_no': sent['pg_no'],
+            'keyword_count': overlap,
+        })
+
+    results.sort(key=lambda x: x['score'], reverse=True)
+
+    return results[:top_n]
