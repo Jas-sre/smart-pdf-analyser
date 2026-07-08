@@ -8,21 +8,25 @@ STOP_WORDS = {
     'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
     'about', 'other', 'some', 'such', 'than', 'then', 'these',
     'those', 'very', 'when', 'where', 'which', 'while', 'will',
-    'with', 'you', 'your', 'they', 'their', 'them', 'this', 'that',
-    'from', 'into', 'more', 'most', 'also', 'any', 'all', 'each'
+    'with', 'you', 'your', 'they', 'their', 'them', 'this', 'that','from', 'into', 'more', 'most', 'also', 'any', 'all', 'each'
 }
 
 def normalize_word(word: str) -> str:
     """Simple stemming: strip trailing 's' for plurals (if word is long enough)."""
+
     word = word.strip('.,!?;:()[]{}"\'-')
+
+    if not re.match(r'^[a-z]+$', word):
+        return ''
+
     if len(word) > 3 and word.endswith('s'):
         word = word[:-1]
     return word
 
 def get_keywords(text: str) -> list:
     words = text.lower().split()
-    filtered = [normalize_word(w) for w in words if normalize_word(w) not in STOP_WORDS]
-    return Counter(filtered).most_common(2)
+    filtered = [normalize_word(w) for w in words if normalize_word(w) and normalize_word(w) not in STOP_WORDS]
+    return Counter(filtered).most_common(5)
 
 def compute_tfidf(pages: list[dict]) -> list:
     """
@@ -36,7 +40,7 @@ def compute_tfidf(pages: list[dict]) -> list:
     tf_idf={}
 
     for page in pages:
-        useful_words=[normalize_word(w) for w in page['text'].lower().split() if normalize_word(w) not in STOP_WORDS]
+        useful_words=[normalize_word(w) for w in page['text'].lower().split() if normalize_word(w) and normalize_word(w) not in STOP_WORDS]
         for x in useful_words:
             words.add(x)
             if x not in tf:
@@ -44,24 +48,23 @@ def compute_tfidf(pages: list[dict]) -> list:
             else:
                 tf[x]+=1
 
-        for x in tf:
-            tf[x]=1+math.log(tf[x])
-
         clean_text = re.sub(r'http[s]?://\S+', 'URL_LINK', page['text'])
         sentences=re.split(r'[.!?]+',clean_text)
-        l=len(sentences)
+        l+=len(sentences)
         for sentence in sentences:
             for word in words:
                 if word in sentence.lower():
                     if word not in idf:
                         idf[word]=idf.get(word,0)+1
+    for x in tf:
+        tf[x]=1+math.log(tf[x])
 
     for word in words:
         tf_idf[word]=round(tf[word]*(math.log(l/idf.get(word,1))+1),4)
 
     return tf_idf
 
-def most_com(pages):
+def most_com_keyword(pages):
     return Counter(compute_tfidf(pages)).most_common(5)
 
 def text_to_sentences(pages: list[dict]) -> list[dict]:
@@ -72,7 +75,7 @@ def text_to_sentences(pages: list[dict]) -> list[dict]:
     """
     l=[]
     for page in pages:
-        clean_text = re.sub(r'http[s]??://\S+', 'URL_LINK', page['text'])
+        clean_text = re.sub(r'http[s]?://\S+', 'URL_LINK', page['text'])
         sentences=re.split(r'[.!?]+',clean_text)
         for sentence in sentences:
             if sentence.strip():
@@ -89,8 +92,7 @@ def bm25_search(pages: list[dict], question: str, top_n: int = 1,
     sentences = text_to_sentences(pages)
     tokenized = []  # will be a list(list)
     for s in sentences:
-        words = [normalize_word(w) for w in s['sentence'].lower().split()
-                 if w and w not in STOP_WORDS]
+        words = [normalize_word(w) for w in s['sentence'].lower().split() if normalize_word(w) and normalize_word(w) not in STOP_WORDS]
         tokenized.append(words)
 
     N = len(tokenized)
@@ -98,13 +100,12 @@ def bm25_search(pages: list[dict], question: str, top_n: int = 1,
         return []
     df = {}
     for words in tokenized:
-        for word in set(words):  # set() avoids counting duplicates or else it will count all the occurence
+        for word in set(words):
             df[word] = df.get(word, 0) + 1
 
     avgl = sum(len(w) for w in tokenized) / N
 
-    query_words = [normalize_word(w) for w in question.lower().split()
-                   if w and w not in STOP_WORDS]
+    query_words = [normalize_word(w) for w in question.lower().split() if normalize_word(w) and normalize_word(w) not in STOP_WORDS]
     if not query_words:
         return []
 
@@ -147,8 +148,7 @@ def get_key_sentences(pages: list[dict], top_n: int = 3) -> list[dict]:
     """
 
     tfidf_scores = compute_tfidf(pages)
-    top_keywords = [word for word, score in
-                    Counter(tfidf_scores).most_common(10)]
+    top_keywords = [word for word, score in Counter(tfidf_scores).most_common(10)]
 
     sentences = text_to_sentences(pages)
 
@@ -164,6 +164,6 @@ def get_key_sentences(pages: list[dict], top_n: int = 3) -> list[dict]:
             'keyword_count': overlap,
         })
 
-    results.sort(key=lambda x: x['score'], reverse=True)
+    results.sort(key=lambda x: x['keyword_count'], reverse=True)
 
     return results[:top_n]
