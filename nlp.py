@@ -12,7 +12,6 @@ STOP_WORDS = {
     'from', 'into', 'more', 'most', 'also', 'any', 'all', 'each'
 }
 
-
 def normalize_word(word: str) -> str:
     """Simple stemming: strip trailing 's' for plurals (if word is long enough)."""
     word = word.strip('.,!?;:()[]{}"\'-')
@@ -64,3 +63,79 @@ def compute_tfidf(pages: list[dict]) -> list:
 
 def most_com(pages):
     return Counter(compute_tfidf(pages)).most_common(5)
+
+def text_to_sentences(pages: list[dict]) -> list[dict]:
+    """
+    Split all pages into sentences, keeping page numbers.
+
+    Returns: [{'sentence': '...', 'pg_no': ...},...]
+    """
+    l=[]
+    for page in pages:
+        clean_text = re.sub(r'http[s]??://\S+', 'URL_LINK', page['text'])
+        sentences=re.split(r'[.!?]+',clean_text)
+        for sentence in sentences:
+            if sentence.strip():
+                l.append({'sentence':sentence,'pg_no':page['pg_no']})
+    return l
+
+def bm25_search(pages: list[dict], question: str, top_n: int = 1,
+                k1: float = 1.5, b: float = 0.75) -> list[dict]:
+    """
+    BM25 search algorithm — industry standard for ranking.
+
+    Returns top N sentences with their BM25 scores.
+    """
+    sentences = text_to_sentences(pages)
+    tokenized = []  # will be a list(list)
+    for s in sentences:
+        words = [normalize_word(w) for w in s['sentence'].lower().split()
+                 if w and w not in STOP_WORDS]
+        tokenized.append(words)
+
+    N = len(tokenized)
+    if N == 0:
+        return []
+    df = {}
+    for words in tokenized:
+        for word in set(words):  # set() avoids counting duplicates or else it will count all the occurence
+            df[word] = df.get(word, 0) + 1
+
+    avgl = sum(len(w) for w in tokenized) / N
+
+    query_words = [normalize_word(w) for w in question.lower().split()
+                   if w and w not in STOP_WORDS]
+    if not query_words:
+        return []
+
+    #bm25 algorithm
+    results = []
+    for i, sent_words in enumerate(tokenized):
+        if not sent_words:
+            continue
+        tf = Counter(sent_words)
+        sent_len = len(sent_words)
+        score = 0.0
+
+        for word in query_words:
+            if word not in tf:
+                continue
+
+            #IDF with smoothing
+            idf = math.log((N - df[word] + 0.5) / (df[word] + 0.5) + 1)
+
+            #TF normalization
+            tf_norm = (tf[word] * (k1 + 1)) / (
+                tf[word] + k1 * (1 - b + b * sent_len / avgl))
+
+            score += idf * tf_norm
+
+        results.append({
+            'sentence': sentences[i]['sentence'],
+            'pg_no': sentences[i]['pg_no'],
+            'score': round(score, 4)
+        })
+
+    results.sort(key=lambda x: x['score'], reverse=True)
+
+    return results[:top_n]
