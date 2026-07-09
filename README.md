@@ -10,7 +10,7 @@ The most interesting part of this project is that all the **_Natural Language Pr
 
 ## 🌐 Live Demo
 
-Try the live app here: [https://jas-sre-smart-pdf-analyser.streamlit.app](https://jas-sre-smart-pdf-analyser.streamlit.app)
+Try the live app here: [https://smart-pdf-analyser.streamlit.app](https://smart-pdf-analyser.streamlit.app/)
 
 
 
