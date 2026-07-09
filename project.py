@@ -25,12 +25,12 @@ def get_page_stats(page_text: str) -> dict:
     return {'words':w,'sentences':s,'characters':ch}
 
 
-def get_document_stats(pages: list[dict]) -> list[dict]:
+def get_document_stats(pages: list[dict]) -> dict[dict]:
     """
     Compute statistics for the given PDF.
 
     Args:
-        pages: List of dicts:{'page_number': int, 'text': str}
+        pages: List of dicts:{'pg_no: int, 'text': str}
 
     Returns:
         dictionary with statistics for total document and each page.

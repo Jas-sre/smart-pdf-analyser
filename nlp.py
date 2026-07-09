@@ -38,7 +38,8 @@ def compute_tfidf(pages: list[dict]) -> list:
     tf={}
     idf={}
     tf_idf={}
-
+    l=0
+    
     for page in pages:
         useful_words=[normalize_word(w) for w in page['text'].lower().split() if normalize_word(w) and normalize_word(w) not in STOP_WORDS]
         for x in useful_words:
